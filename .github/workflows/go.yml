@@ -1,0 +1,93 @@
+name: Go
+
+on:
+  push:
+    branches:
+      - master
+      - feature/*
+    tags:
+      - v*
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.14
+        id: go
+      - name: Prepare
+        id: prepare
+        run: |
+          DOCKER_IMAGE=fzymgc/cert-manager-webhook-dnsimple
+          DOCKER_PLATFORMS=linux/amd64,linux/arm64,linux/386
+          VERSION=latest
+
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+
+          if [[ $GITHUB_REF == refs/heads/feature/* ]]; then
+            VERSION="$(date -u +'%Y%m%dT%H%M%SZ')_${GITHUB_SHA::12}"
+          fi
+
+          TAGS="--tag ${DOCKER_IMAGE}:${VERSION}"
+          if [[ $VERSION =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            TAGS="$TAGS --tag ${DOCKER_IMAGE}:latest"
+          fi
+
+          echo "::set-output name=docker_image::${DOCKER_IMAGE}"
+          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=buildx_args::--platform ${DOCKER_PLATFORMS} --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') --build-arg VCS_REF=${GITHUB_SHA::8} ${TAGS}"
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: crazy-max/ghaction-docker-buildx@v3
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+
+      - name: Build Binaries
+        id: build_binaries
+        run: |
+          CGO_ENABLED=0 go build -o webhook -ldflags '-w -extldflags "-static"' .
+
+      - name: Test
+        id: test
+        run: go test -v .
+
+      - name: Build Images
+        id: build_images
+        run: |
+          docker buildx build --output "type=image,push=false" ${{steps.prepare.outputs.buildx_args}} -f Dockerfile .
+
+      - name: Docker Login
+        if: success() && github.event_name != 'pull_request'
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_HUB_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_HUB_TOKEN}}
+        run: |
+          echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+
+      - name: Docker Push
+        if: success() && github.event_name != 'pull_request'
+        run: |
+          docker buildx build --output "type=image,push=true" ${{steps.prepare.outputs.buildx_args}} -f build/docker/Dev.dockerfile .
+
+      - name: Docker Check Manifest
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          docker run --rm mplatform/mquery ${{ steps.prepare.outputs.docker_image }}:${{ steps.prepare.outputs.version }}
+
+      - name: Clear  Credentials
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          rm -f ${HOME}/.docker/config.json
