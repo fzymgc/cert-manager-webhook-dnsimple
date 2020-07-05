@@ -64,7 +64,7 @@ jobs:
         id: test
         env:
           DNSIMPLE_USE_SANDBOX: "1"
-          TEST_ZONE_NAME: test133domain.com
+          TEST_ZONE_NAME: fzymgc.guru
         run: |
           sed -e 's/__ACCOUNT_ID__/${{secrets.DNSIMPLE_ACCOUNT_ID}}/' testdata/dnsimple/config.json.example |tee testdata/dnsimple/config.json
 
