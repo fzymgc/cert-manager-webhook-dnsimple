@@ -4,4 +4,4 @@ metadata:
   name: dnsimple-token
 type: Opaque
 data:
-  token: <API-Token-(Base64-encoded)>
+  token: __API_TOKEN_BASE64_ENCODED__

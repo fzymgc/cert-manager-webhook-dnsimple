@@ -66,13 +66,13 @@ jobs:
           DNSIMPLE_USE_SANDBOX: "1"
           TEST_ZONE_NAME: test133domain.com
         run: |
-          ( cd testdata/dnsimple \
-              && sed -e 's/\<Account-Id\>/${{secrets.DNSIMPLE_ACCOUNT_ID}}/' config.json.example |tee config.json \
-              && sed -e 's/\<API-Token-\(Base64-encoded\)>/${{secrets.DNSIMPLE_ACCOUNT_TOKEN}}/' dnsimple-token.yaml.example | tee dnsimple-token.yaml
-          )
+          sed -e 's/__ACCOUNT_ID__/${{secrets.DNSIMPLE_ACCOUNT_ID}}/' testdata/dnsimple/config.json.example |tee testdata/dnsimple/config.json
+
+          sed -e 's/__API_TOKEN_BASE64_ENCODED__/${{secrets.DNSIMPLE_ACCOUNT_TOKEN}}/' testdata/dnsimple/dnsimple-token.yaml.example | tee testdata/dnsimple/dnsimple-token.yaml
 
           mkdir -p __main__/hack
-          wget -O- https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-1.14.1-linux-amd64.tar.gz | tar xz --strip-components=1 -C __main__/hack
+
+          wget -q -O- https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-1.14.1-linux-amd64.tar.gz | tar xz --strip-components=1 -C __main__/hack
 
           go test -v .
 

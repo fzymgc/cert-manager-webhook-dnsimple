@@ -3,5 +3,5 @@
         "name": "dnsimple-token",
         "key": "token"
     },
-    "account": "<Account-ID>"
+    "account": "__ACCOUNT_ID__"
 }
